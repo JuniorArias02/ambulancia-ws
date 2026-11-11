@@ -14,6 +14,7 @@ export const EVENTOS_NEGOCIO = [
   'ambulancia.ubicacion_actualizada',
   'turno.actualizado',
   'mi_servicio.actualizado',
+  'seguimiento.actualizado',
 ] as const;
 
 export type EventoNegocio = (typeof EVENTOS_NEGOCIO)[number];

@@ -21,6 +21,8 @@ Object.assign(process.env, {
 const DESPACHADOR = '11111111-1111-4111-8111-111111111111';
 const CONDUCTOR_A = '22222222-2222-4222-8222-222222222222';
 const CONDUCTOR_B = '33333333-3333-4333-8333-333333333333';
+const CIUDADANO_A = '44444444-4444-4444-8444-444444444444';
+const CIUDADANO_B = '55555555-5555-4555-8555-555555555555';
 
 /** Reemplaza a la API: cada token corresponde a una sesión, o falla. */
 class VerificadorSesionesFalso extends VerificadorSesiones {
@@ -81,6 +83,16 @@ describe('Servidor de tiempo real (E2E)', () => {
     verificador.sesiones.set('t-conductor-b', {
       usuarioId: CONDUCTOR_B,
       rol: 'conductor',
+      expiraEn: enUnaHora(),
+    });
+    verificador.sesiones.set('t-ciudadano-a', {
+      usuarioId: CIUDADANO_A,
+      rol: 'ciudadano',
+      expiraEn: enUnaHora(),
+    });
+    verificador.sesiones.set('t-ciudadano-b', {
+      usuarioId: CIUDADANO_B,
+      rol: 'ciudadano',
       expiraEn: enUnaHora(),
     });
   });
@@ -286,5 +298,84 @@ describe('Servidor de tiempo real (E2E)', () => {
       { mensaje: 'Token inválido' },
       { mensaje: 'Sus permisos cambiaron; inicie sesión de nuevo' },
     ]);
+  });
+
+  describe('ciudadano', () => {
+    const seguimiento = {
+      seguimiento: {
+        emergenciaId: 'e1',
+        numeroEmergencia: 'EMG-20261104-0001',
+        disponible: true,
+        ambulancias: [],
+      },
+    };
+
+    it('entra solo a su propia sala, nunca a la central', async () => {
+      const { evento, datos } = await conectar('t-ciudadano-a');
+
+      expect(evento).toBe('conectado');
+      expect(datos).toEqual({
+        usuarioId: CIUDADANO_A,
+        rol: 'ciudadano',
+        salas: [`usuario:${CIUDADANO_A}`],
+      });
+    });
+
+    it('recibe el seguimiento de su reporte y nadie más lo recibe', async () => {
+      const ciudadanoA = await conectar('t-ciudadano-a');
+      const ciudadanoB = await conectar('t-ciudadano-b');
+      const despachador = await conectar('t-despachador');
+      const enA = escuchar(ciudadanoA.socket, 'seguimiento.actualizado');
+      const enB = escuchar(ciudadanoB.socket, 'seguimiento.actualizado');
+      const enCentral = escuchar(despachador.socket, 'seguimiento.actualizado');
+
+      const respuesta = await publicar({
+        tipo: 'seguimiento.actualizado',
+        salas: [`usuario:${CIUDADANO_A}`],
+        datos: seguimiento,
+      });
+      await pausa();
+
+      expect(respuesta.status).toBe(202);
+      expect(enA).toEqual([
+        expect.objectContaining({
+          tipo: 'seguimiento.actualizado',
+          datos: seguimiento,
+        }),
+      ]);
+      expect(enB).toEqual([]);
+      expect(enCentral).toEqual([]);
+    });
+
+    it('no recibe nada de la central', async () => {
+      const ciudadano = await conectar('t-ciudadano-a');
+      const recibidos = [
+        'emergencia.creada',
+        'ambulancia.ubicacion_actualizada',
+      ].flatMap((evento) => escuchar(ciudadano.socket, evento));
+
+      await publicar({});
+      await publicar({
+        tipo: 'ambulancia.ubicacion_actualizada',
+        datos: { ambulanciaId: 'a1', latitud: 7.89, longitud: -72.5 },
+      });
+      await pausa();
+
+      expect(recibidos).toEqual([]);
+    });
+
+    it('queda desconectado si lo bloquean', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval'] });
+      const { socket } = await conectar('t-ciudadano-a');
+      const error = new Promise((resolver) =>
+        socket.once('error_autenticacion', resolver),
+      );
+
+      // La API rechaza la sesión de un usuario bloqueado.
+      verificador.sesiones.delete('t-ciudadano-a');
+      vi.advanceTimersByTime(INTERVALO_REVALIDACION_MS);
+
+      expect(await error).toEqual({ mensaje: 'Token inválido' });
+    });
   });
 });

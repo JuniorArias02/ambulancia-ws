@@ -33,6 +33,7 @@ Mientras el socket está abierto, el servidor revisa la sesión **cada 60 s**. A
 | --- | --- |
 | `administrador`, `despachador` | Todo lo de la central (sala `central`) |
 | `conductor`, `paramedico` | Solo `mi_servicio.actualizado`, con **su propio** servicio (sala `usuario:{id}`) |
+| `ciudadano` | Solo `seguimiento.actualizado`, de **sus propios** reportes (sala `usuario:{id}`). **Nunca** entra a la central |
 
 ## 3. Eventos
 
@@ -58,6 +59,7 @@ Los DTO son **los mismos que devuelve el REST** (ver [`api-emergencias-frontend.
 | `emergencia.posible_duplicado` | `{ emergenciaId, numeroEmergencia, posibles: PosibleDuplicadaRespuesta[] }` | Al crearla, si hay candidatas. **Solo una sugerencia**: nunca se marca sola |
 | `asignacion.creada` | `{ asignacion: AsignacionRespuesta }` | Despacho |
 | `asignacion.actualizada` | `{ asignacion: AsignacionRespuesta }` | Avance o cancelación |
+| `asignacion.ruta_actualizada` | `{ ruta: Ruta }` (ver [`api-rutas-frontend.md`](../../back/api/docs/api-rutas-frontend.md)) | Se calculó una ruta nueva para el servicio (despacho, primer GPS o desvío). Llega a la central **y a la tripulación de ese servicio** |
 | `ambulancia.actualizada` | `{ ambulancia: AmbulanciaRespuesta }` | Alta, edición, cambio de estado, despacho, fin de servicio o fin de turno |
 | `ambulancia.ubicacion_actualizada` | `{ ambulanciaId, asignacionId, latitud, longitud, velocidad, registradaEn }` | GPS. **Máximo una cada 3 s por ambulancia**: las intermedias se descartan |
 | `turno.actualizado` | `{ turno: TurnoRespuesta }` | Inicio, cambio de integrantes o fin de turno |
@@ -69,6 +71,14 @@ Los DTO son **los mismos que devuelve el REST** (ver [`api-emergencias-frontend.
 | `mi_servicio.actualizado` | `MiServicioRespuesta`, **la misma forma que `GET /mi-servicio`** | Le asignan un servicio, cambia su avance o se cancela; cambia la emergencia que atiende (prioridad, dirección…); entra o sale de un turno |
 
 La app **reemplaza** su estado con ese payload. Si sale del turno, llega `{ turno: null, asignacion: null, emergencia: null }`.
+
+### Ciudadano (`ciudadano`)
+
+| Evento | `datos` | Cuándo |
+| --- | --- | --- |
+| `seguimiento.actualizado` | `{ seguimiento: SeguimientoEmergencia }`, el mismo objeto que `GET /ciudadanos/emergencias/{id}/seguimiento` | Al despachar una ambulancia a su reporte; con cada movimiento (máximo uno cada 3 s por ambulancia); con cada cambio de etapa o de ruta. Termina con un último evento `disponible: false` |
+
+Solo le llega al ciudadano que hizo el reporte. Detalle de los campos y del uso en la app: [`SEGUIMIENTO_AMBULANCIA_CIUDADANO_FLUTTER.md`](../../back/api/docs/SEGUIMIENTO_AMBULANCIA_CIUDADANO_FLUTTER.md), sección 4.
 
 ## 4. Reglas para los clientes
 
@@ -164,7 +174,7 @@ Mientras no tenga conexión, la app puede seguir consultando `GET /mi-servicio` 
 ```ts
 type Sala = 'central' | `usuario:${string}`;
 
-interface ConexionEstablecida { usuarioId: string; rol: 'administrador' | 'despachador' | 'paramedico' | 'conductor'; salas: Sala[] }
+interface ConexionEstablecida { usuarioId: string; rol: 'administrador' | 'despachador' | 'paramedico' | 'conductor' | 'ciudadano'; salas: Sala[] }
 interface ErrorTiempoReal { mensaje: string }
 
 interface UbicacionTiempoReal {
@@ -182,10 +192,12 @@ interface DatosEventos {
   'emergencia.posible_duplicado': { emergenciaId: string; numeroEmergencia: string; posibles: PosibleDuplicadaRespuesta[] };
   'asignacion.creada': { asignacion: AsignacionRespuesta };
   'asignacion.actualizada': { asignacion: AsignacionRespuesta };
+  'asignacion.ruta_actualizada': { ruta: Ruta };
   'ambulancia.actualizada': { ambulancia: AmbulanciaRespuesta };
   'ambulancia.ubicacion_actualizada': UbicacionTiempoReal;
   'turno.actualizado': { turno: TurnoRespuesta };
   'mi_servicio.actualizado': MiServicioRespuesta;
+  'seguimiento.actualizado': { seguimiento: SeguimientoEmergencia };
 }
 ```
 

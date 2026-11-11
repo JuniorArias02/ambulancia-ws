@@ -22,6 +22,12 @@ describe('salas', () => {
     ]);
   });
 
+  it('el ciudadano nunca entra a la central', () => {
+    expect(salasPermitidas(usuarioId, 'ciudadano')).toEqual([
+      `usuario:${usuarioId}`,
+    ]);
+  });
+
   it('solo acepta como destino salas conocidas', () => {
     expect(PATRON_SALA.test('central')).toBe(true);
     expect(PATRON_SALA.test(`usuario:${usuarioId}`)).toBe(true);

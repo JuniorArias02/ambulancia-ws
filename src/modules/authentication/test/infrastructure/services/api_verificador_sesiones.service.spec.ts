@@ -63,6 +63,20 @@ describe('ApiVerificadorSesiones', () => {
     );
   });
 
+  it('acepta la sesión de un ciudadano', async () => {
+    fetchFalso.mockResolvedValue(
+      responder(200, {
+        usuarioId: 'u2',
+        rol: 'ciudadano',
+        expiraEn: '2026-11-04T20:00:00.000Z',
+      }),
+    );
+
+    const sesion = await verificador.verificar('token-ciudadano');
+
+    expect(sesion.rol).toBe('ciudadano');
+  });
+
   it('una clave interna rechazada no saca al usuario de su sesión', async () => {
     fetchFalso.mockResolvedValue(responder(403, { mensaje: 'Clave' }));
 

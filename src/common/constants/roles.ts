@@ -7,6 +7,8 @@ export const Roles = {
   DESPACHADOR: 'despachador',
   PARAMEDICO: 'paramedico',
   CONDUCTOR: 'conductor',
+  /** Reporta emergencias desde la app; solo sigue la ambulancia de su propio reporte. */
+  CIUDADANO: 'ciudadano',
 } as const;
 
 export type NombreRol = (typeof Roles)[keyof typeof Roles];

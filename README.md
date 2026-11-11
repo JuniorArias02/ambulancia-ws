@@ -37,9 +37,11 @@ No tiene base de datos ni conoce el secreto JWT: la API es la única autoridad s
 | Sala | Quién entra |
 | --- | --- |
 | `central` | `administrador`, `despachador` |
-| `usuario:{id}` | cada usuario, solo la suya |
+| `usuario:{id}` | cada usuario, solo la suya. Es la **única** sala de la tripulación (`conductor`, `paramedico`) y del `ciudadano` |
 
 El cliente no puede unirse a salas: no hay eventos cliente → servidor.
+
+El `ciudadano` solo recibe `seguimiento.actualizado`, la ambulancia de su propio reporte, y **nunca** entra a `central`, que lleva datos de todas las emergencias y de la flota. Los roles se copian de `back/api/src/common/constants/roles.ts`: si la API agrega uno, hay que agregarlo en `src/common/constants/roles.ts`. Si no, esas sesiones reciben `error_autenticacion`.
 
 ### Seguridad
 
